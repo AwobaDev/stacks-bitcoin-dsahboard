@@ -110,3 +110,67 @@
     (<= projected-spending budget)
   )
 )
+
+;; public functions
+(define-public (add-funds (amount uint))
+  (begin
+    (asserts! (> amount u0) err-invalid-amount)
+    (var-set total-balance (+ (var-get total-balance) amount))
+    (ok (var-get total-balance))
+  )
+)
+
+(define-public (add-expense (description (string-ascii 256)) (amount uint) (recipient principal) (category-id uint) (notes (string-ascii 512)))
+  (let (
+    (expense-id (var-get expense-counter))
+    (current-time (get-current-time))
+    (category (map-get? expense-categories { category-id: category-id }))
+  )
+    (begin
+      (asserts! (is-owner) err-owner-only)
+      (asserts! (> amount u0) err-invalid-amount)
+      (asserts! (not (is-none category)) err-not-found)
+      (asserts! (get active (unwrap! category err-not-found)) err-not-found)
+      
+      (map-set expenses 
+        { expense-id: expense-id } 
+        { 
+          description: description, 
+          amount: amount, 
+          status: status-pending, 
+          recipient: recipient,
+          category-id: category-id,
+          created-by: tx-sender,
+          created-at: current-time,
+          last-modified: current-time,
+          approver: none,
+          payment-tx: none,
+          notes: notes
+        }
+      )
+      (var-set expense-counter (+ expense-id u1))
+      (var-set total-expenses-pending (+ (var-get total-expenses-pending) amount))
+      (ok expense-id)
+    )
+  )
+)
+
+(define-public (add-category (name (string-ascii 64)) (budget uint))
+  (let (
+    (category-id (var-get category-counter))
+  )
+    (begin
+      (asserts! (is-owner) err-owner-only)
+      (var-set category-counter (+ category-id u1))
+      (map-set expense-categories
+        { category-id: category-id }
+        {
+          name: name,
+          budget: budget,
+          active: true
+        }
+      )
+      (ok category-id)
+    )
+  )
+)
